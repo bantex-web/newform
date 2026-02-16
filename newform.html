@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FootyDash Pro | 4K Tactical Studio</title>
+    <style>
+        :root {
+            --bg: #040508;
+            --sidebar: #0d1117;
+            --accent: #00ff88;
+            --gk-color: #ffcc00;
+            --def-color: #00d9ff;
+            --mid-color: #bd00ff;
+            --fwd-color: #ff3c00;
+            --pitch-line: rgba(255, 255, 255, 0.6);
+            --grass-dark: #142d18;
+            --grass-light: #1b3a20;
+        }
+
+        body { background-color: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- SIDEBAR --- */
+        .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid #30363d; display: flex; flex-direction: column; z-index: 100; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .sidebar-header { padding: 25px; border-bottom: 2px solid var(--accent); background: linear-gradient(to bottom, #161b22, #0d1117); }
+        .player-list-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        .pos-header { font-size: 10px; letter-spacing: 2px; margin: 20px 0 8px 0; font-weight: 800; opacity: 0.6; text-transform: uppercase; }
+        .player-chip { background: #21262d; padding: 12px; border-radius: 8px; margin-bottom: 6px; cursor: grab; font-size: 13px; border: 1px solid transparent; transition: 0.2s; }
+        .player-chip:hover { border-color: var(--accent); background: #30363d; transform: translateX(5px); }
+
+        /* --- THE ATTRACTIVE PITCH (V3) --- */
+        .viewport { 
+            flex-grow: 1; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            background: radial-gradient(circle at center, #1e4d2b 0%, #05080a 100%); 
+            padding: 40px;
+        }
+
+        /* The Grass Texture */
+        .pitch-canvas { 
+            width: 100%; 
+            height: 70%; 
+            max-width: 950px;
+            background: 
+                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                repeating-linear-gradient(90deg, var(--grass-dark) 0% 10%, var(--grass-light) 10% 20%);
+            border: 3px solid var(--pitch-line); 
+            border-radius: 4px;
+            position: relative; 
+            box-shadow: 0 0 100px rgba(0, 255, 136, 0.15), inset 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* HD Markings */
+        .pitch-canvas::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--pitch-line); }
+        .center-circle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 140px; height: 140px; border: 2px solid var(--pitch-line); border-radius: 50%; }
+        .box-l, .box-r { position: absolute; top: 50%; transform: translateY(-50%); width: 16%; height: 50%; border: 2px solid var(--pitch-line); }
+        .box-l { left: 0; border-left: none; } .box-r { right: 0; border-right: none; }
+        
+        /* Goal Net Visuals */
+        .goal-net { position: absolute; top: 50%; transform: translateY(-50%); width: 20px; height: 25%; background: rgba(255,255,255,0.05); border: 1px solid var(--pitch-line); }
+        .goal-l { left: -22px; border-radius: 5px 0 0 5px; }
+        .goal-r { right: -22px; border-radius: 0 5px 5px 0; }
+
+        /* --- BOTTOM UI --- */
+        .bottom-shelf { width: 100%; max-width: 950px; display: flex; gap: 15px; margin-top: 25px; height: 90px; }
+        .bench-container { flex-grow: 1; background: rgba(255,255,255,0.02); backdrop-filter: blur(10px); border: 1px dashed var(--pitch-line); border-radius: 15px; display: flex; align-items: center; padding: 0 15px; gap: 12px; overflow-x: auto; position: relative; }
+        .trash-zone { width: 80px; background: rgba(255, 60, 0, 0.05); border: 1px dashed var(--fwd-color); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: 0.3s; }
+        .trash-zone:hover { background: rgba(255, 60, 0, 0.2); }
+
+        /* --- TOKENS (GLASS DESIGN) --- */
+        .token { 
+            width: 48px; height: 48px; 
+            background: rgba(255,255,255,0.1); 
+            backdrop-filter: blur(12px); 
+            color: white; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 12px; font-weight: 900; 
+            border: 2px solid white; 
+            cursor: move; position: absolute; z-index: 50; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.2);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .token:hover { transform: scale(1.15); }
+        .token-bench { position: relative !important; left: auto !important; top: auto !important; flex-shrink: 0; }
+
+        /* --- REVEAL OVERLAY --- */
+        #reveal-overlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #0d1117, #030405); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(25px); }
+        .reveal-content { text-align: center; width: 90%; max-width: 1000px; animation: zoomIn 0.5s ease; }
+        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .reveal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-top: 40px; }
+        .reveal-card { background: rgba(255,255,255,0.03); padding: 25px; border-radius: 12px; border-left: 5px solid var(--accent); text-align: left; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .reveal-card .pos { font-size: 10px; color: var(--accent); font-weight: 900; margin-bottom: 5px; }
+        .reveal-card .name { font-size: 1.3rem; font-weight: 800; }
+
+        .btn-main { background: var(--accent); color: black; border: none; padding: 14px 30px; border-radius: 50px; font-weight: 900; cursor: pointer; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header"><h2>FOOTY<span>DASH</span></h2></div>
+        <div class="player-list-container">
+            <div class="pos-header" style="color:var(--gk-color)">🧤 Goalkeepers</div>
+            <div id="GK-list"></div>
+            <div class="pos-header" style="color:var(--def-color)">🛡️ Defenders</div>
+            <div id="DEF-list"></div>
+            <div class="pos-header" style="color:var(--mid-color)">⚙️ Midfielders</div>
+            <div id="MID-list"></div>
+            <div class="pos-header" style="color:var(--fwd-color)">🚀 Attackers</div>
+            <div id="FWD-list"></div>
+        </div>
+    </div>
+
+    <div class="viewport">
+        <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px;">
+            <button class="btn-main" onclick="showReveal()">Confirm Dream XI</button>
+            <button class="btn-main" style="background:#333; color:white;" onclick="location.reload()">Reset</button>
+        </div>
+
+        <div class="pitch-canvas" id="pitch" ondrop="handleDrop(event, 'pitch')" ondragover="allowDrop(event)">
+            <div class="goal-net goal-l"></div>
+            <div class="goal-net goal-r"></div>
+            <div class="center-circle"></div>
+            <div class="box-l"></div>
+            <div class="box-r"></div>
+        </div>
+
+        <div class="bottom-shelf">
+            <div class="bench-container" id="bench" ondrop="handleDrop(event, 'bench')" ondragover="allowDrop(event)">
+                <span style="position:absolute; top:-12px; left:15px; font-size:10px; color:var(--accent); font-weight:bold; background:var(--bg); padding: 0 5px;">RESERVES</span>
+            </div>
+            <div class="trash-zone" ondrop="handleDrop(event, 'trash')" ondragover="allowDrop(event)">🗑️</div>
+        </div>
+    </div>
+
+    <div id="reveal-overlay">
+        <div class="reveal-content">
+            <h1 style="font-size: 3.5rem; margin-bottom: 0;">DREAM TEAM</h1>
+            <p style="opacity: 0.5; letter-spacing: 5px; margin-bottom: 40px;">STARTING ELEVEN</p>
+            <div class="reveal-grid" id="reveal-grid"></div>
+            <button class="btn-main" style="margin-top: 50px;" onclick="document.getElementById('reveal-overlay').style.display='none'">Return to Pitch</button>
+        </div>
+    </div>
+
+    <script>
+        const database = {
+            GK: ["Alisson", "Courtois", "Ederson", "Ter Stegen", "Maignan", "Donnarumma", "Oblak", "Raya", "Kobel", "Vicario"],
+            DEF: ["Van Dijk", "Rüdiger", "Saliba", "Ruben Dias", "Hakimi", "Theo Hernandez", "Davies", "Araujo", "Gabriel", "Gvardiol", "Kounde", "Trent AA", "Frimpong", "Bastoni", "Stones"],
+            MID: ["Rodri", "De Bruyne", "Bellingham", "Pedri", "Rice", "Odegaard", "Musiala", "Wirtz", "Valverde", "Camavinga", "Gavi", "Fernandes", "Kimmich", "Vitinha", "Mac Allister", "Tchouameni"],
+            FWD: ["Messi", "Ronaldo", "Mbappé", "Haaland", "Vinícius Jr", "Lamine Yamal", "Salah", "Kane", "Saka", "Griezmann", "Neymar Jr", "Leao", "Lautaro", "Osimhen", "Palmer", "Foden"]
+        };
+
+        Object.keys(database).forEach(pos => {
+            const list = document.getElementById(pos + '-list');
+            database[pos].forEach((name, i) => {
+                const div = document.createElement('div');
+                div.className = 'player-chip';
+                div.draggable = true;
+                div.id = `raw-${pos}-${i}`;
+                div.dataset.name = name;
+                div.dataset.pos = pos;
+                div.dataset.color = `var(--${pos.toLowerCase()}-color)`;
+                div.innerHTML = name;
+                div.ondragstart = (e) => {
+                    e.dataTransfer.setData("text", e.target.id);
+                    e.dataTransfer.setData("type", "NEW");
+                    // Comfortable Circle Drag
+                    const img = document.createElement('div');
+                    img.style.width='40px'; img.style.height='40px'; img.style.borderRadius='50%'; img.style.background='white';
+                    document.body.appendChild(img); e.dataTransfer.setDragImage(img, 20, 20);
+                    setTimeout(() => document.body.removeChild(img), 0);
+                };
+                list.appendChild(div);
+            });
+        });
+
+        function allowDrop(ev) { ev.preventDefault(); }
+
+        function handleDrop(ev, zone) {
+            ev.preventDefault();
+            const type = ev.dataTransfer.getData("type");
+            const id = ev.dataTransfer.getData("text");
+            if (zone === 'trash') { if (type === "EXISTING") document.getElementById(id).remove(); return; }
+            let token;
+            if (type === "NEW") {
+                const raw = document.getElementById(id);
+                token = document.createElement('div');
+                token.className = 'token'; token.id = "token-" + Date.now();
+                token.draggable = true;
+                token.dataset.fullname = raw.dataset.name;
+                token.dataset.pos = raw.dataset.pos;
+                token.style.borderColor = raw.dataset.color;
+                token.innerText = raw.dataset.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                token.ondragstart = (e) => { e.dataTransfer.setData("text", e.target.id); e.dataTransfer.setData("type", "EXISTING"); };
+            } else { token = document.getElementById(id); }
+
+            if (zone === 'pitch') {
+                token.classList.remove('token-bench');
+                const rect = document.getElementById('pitch').getBoundingClientRect();
+                token.style.left = (ev.clientX - rect.left - 24) + "px";
+                token.style.top = (ev.clientY - rect.top - 24) + "px";
+                document.getElementById('pitch').appendChild(token);
+            } else {
+                token.classList.add('token-bench'); token.style.left="auto"; token.style.top="auto";
+                document.getElementById('bench').appendChild(token);
+            }
+        }
+
+        function showReveal() {
+            const players = document.querySelectorAll('#pitch .token');
+            const grid = document.getElementById('reveal-grid');
+            grid.innerHTML = "";
+            if (players.length === 0) { alert("Your pitch is empty!"); return; }
+
+            players.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'reveal-card';
+                card.style.borderLeftColor = p.style.borderColor;
+                card.innerHTML = `<div class="pos">${p.dataset.pos}</div><div class="name">${p.dataset.fullname}</div>`;
+                grid.appendChild(card);
+            });
+            document.getElementById('reveal-overlay').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
